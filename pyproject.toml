@@ -1,14 +1,19 @@
 [project]
 name = "pokemon-classification"
 version = "0.1.0"
-description = "Add your description here"
+description = "A pokemon classification project"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "datasets>=4.4.2",
+    "pillow>=12.1.0",
+    "tqdm>=4.67.1",
 ]
 
 [dependency-groups]
 dev = [
+    "ipywidgets>=8.1.8",
+    "notebook>=7.5.1",
     "pre-commit>=4.3.0",
     "ruff>=0.14.7",
 ]
