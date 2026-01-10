@@ -9,7 +9,17 @@
   ],
   // Applique les corrections automatiques (comme pre-commit --fix)
   "editor.codeActionsOnSave": {
-    "source.fixAll": "always"
+    "source.fixAll.ruff": "always",
+    "source.organizeImports.ruff": "always"
+  },
+  // For notebook
+  "notebook.formatOnSave.enabled": true,
+  "notebook.codeActionsOnSave": {
+    "notebook.source.fixAll": "explicit",
+    "notebook.source.organizeImports": "explicit"
+  },
+  "[python]": {
+    "editor.defaultFormatter": "charliermarsh.ruff"
   },
   // Utilise ta config du projet
   "ruff.organizeImports": true,
