@@ -1,7 +1,10 @@
 import re
 from pathlib import Path
 
+import cv2
+import numpy as np
 import pandas as pd
+from matplotlib import pyplot as plt
 
 
 def build_dataframe(data_dir: Path) -> pd.DataFrame:
@@ -42,3 +45,52 @@ def build_dataframe(data_dir: Path) -> pd.DataFrame:
     df = pd.DataFrame(rows)
 
     return df.sort_values(["pokemon", "path"]).reset_index(drop=True)
+
+
+def load_image(path: str | Path, *, as_gray: bool = False) -> np.ndarray:
+    """
+    Load an image from disk using OpenCV
+
+    Parameters
+    ----------
+    path : str | Path
+        Path to the image file
+    as_gray : bool, optional
+        If True, the image is loaded in grayscale, otherwise, it is loaded in color
+
+    Returns
+    -------
+    np.ndarray
+        Loaded image as a NumPy array
+
+    Raises
+    ------
+    FileNotFoundError
+        If the file does not exist or cannot be decoded
+    """
+    data = np.fromfile(str(path), dtype=np.uint8)
+    img = cv2.imdecode(data, cv2.IMREAD_GRAYSCALE if as_gray else cv2.IMREAD_COLOR)
+    if img is None:
+        raise FileNotFoundError(f"Unable to load image: {path}")
+    return img
+
+
+def show_image(img: np.ndarray, title: str = "", *, cmap: str | None = None) -> None:
+    """
+    Display an image using matplotlib
+
+    Parameters
+    ----------
+    img : np.ndarray
+        Image to display
+    title : str, optional
+        Figure title
+    cmap : str | None, optional
+        Colormap
+    """
+    cmap = cmap or "gray" if img.ndim == 2 else None
+    plt.figure(figsize=(6, 6))
+    plt.imshow(img, cmap=cmap)
+    plt.title(title)
+    plt.axis("off")
+    plt.show()
