@@ -10,33 +10,10 @@ from datasets import load_dataset
 from PIL import Image, UnidentifiedImageError
 from tqdm import tqdm
 
+from logging_config import setup_logging
+
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
-
-
-# ------------------- LOGGING CONFIGURATION --------------------------
-class ColorFormatter(logging.Formatter):
-    COLORS = {
-        logging.DEBUG: "\033[92m",  # Green
-        logging.INFO: "\033[96m",  # Cyan
-        logging.WARNING: "\033[93m",  # Yellow
-        logging.ERROR: "\033[91m",  # Red
-        logging.CRITICAL: "\033[91;1m",  # Bold red
-    }
-    RESET = "\033[0m"
-
-    def format(self, record: logging.LogRecord) -> str:
-        color = self.COLORS.get(record.levelno, self.RESET)
-        message = super().format(record)
-        return f"{color}{message}{self.RESET}"
-
-
-log_format = "[%(levelname)s] : %(message)s"
-
-logging.basicConfig(level=logging.INFO, format=log_format)
-
-for handler in logging.getLogger().handlers:
-    handler.setFormatter(ColorFormatter(log_format))
+setup_logging(logging.INFO)
 
 logging.getLogger("httpx").setLevel(logging.WARNING)
 

@@ -4,7 +4,6 @@ from pathlib import Path
 import cv2
 import numpy as np
 import pandas as pd
-from matplotlib import pyplot as plt
 
 
 def build_dataframe(data_dir: Path) -> pd.DataFrame:
@@ -73,24 +72,3 @@ def load_image(path: str | Path, *, as_gray: bool = False) -> np.ndarray:
     if img is None:
         raise FileNotFoundError(f"Unable to load image: {path}")
     return img
-
-
-def show_image(img: np.ndarray, title: str = "", *, cmap: str | None = None) -> None:
-    """
-    Display an image using matplotlib
-
-    Parameters
-    ----------
-    img : np.ndarray
-        Image to display
-    title : str, optional
-        Figure title
-    cmap : str | None, optional
-        Colormap
-    """
-    cmap = cmap or "gray" if img.ndim == 2 else None
-    plt.figure(figsize=(6, 6))
-    plt.imshow(img, cmap=cmap)
-    plt.title(title)
-    plt.axis("off")
-    plt.show()
