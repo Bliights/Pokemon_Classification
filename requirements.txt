@@ -1083,20 +1083,20 @@ numpy==2.4.2 \
     #   contourpy
     #   datasets
     #   matplotlib
-    #   opencv-python
+    #   opencv-contrib-python
     #   pandas
     #   scikit-learn
     #   scipy
     #   seaborn
-opencv-python==4.13.0.92 \
-    --hash=sha256:0bc2596e68f972ca452d80f444bc404e08807d021fbba40df26b61b18e01838a \
-    --hash=sha256:372fe164a3148ac1ca51e5f3ad0541a4a276452273f503441d718fab9c5e5f59 \
-    --hash=sha256:402033cddf9d294693094de5ef532339f14ce821da3ad7df7c9f6e8316da32cf \
-    --hash=sha256:423d934c9fafb91aad38edf26efb46da91ffbc05f3f59c4b0c72e699720706f5 \
-    --hash=sha256:5868a8c028a0b37561579bfb8ac1875babdc69546d236249fff296a8c010ccf9 \
-    --hash=sha256:620d602b8f7d8b8dab5f4b99c6eb353e78d3fb8b0f53db1bd258bb1aa001c1d5 \
-    --hash=sha256:bccaabf9eb7f897ca61880ce2869dcd9b25b72129c28478e7f2a5e8dee945616 \
-    --hash=sha256:caf60c071ec391ba51ed00a4a920f996d0b64e3e46068aac1f646b5de0326a19
+opencv-contrib-python==4.13.0.92 \
+    --hash=sha256:1973d0fc773873f9d1b5bf0d1b65895da2f47b06ba033b7d58393f5c28ba0778 \
+    --hash=sha256:53c8ab81376210dda5836307eb6bda7266f39a3820a9a070c7131510ba815fe1 \
+    --hash=sha256:5f9cb522dd9e465dfca3536c15288f7936b9827432fb9c885eaf94dc5f88c2a3 \
+    --hash=sha256:a3c54377c5cf9c45d9b1a207df26dc8fe4f1042d07036cb17d80930c04b25d97 \
+    --hash=sha256:cb694dcf76bb2c8d7fa573fc1a99339e8b6640194d7778381e74cc3445369e45 \
+    --hash=sha256:f5d02357f4d5575c300eab3ec1c7ecfed3a9a53e55a76927bab7cfc9e0a67b68 \
+    --hash=sha256:f9ceec5886419860a31b518991a99e978e5a6a78dca1470103ad4ede0155f156 \
+    --hash=sha256:fc5ee50e2be9d40e913536f7f20cc6f87f25d8e413ebb32a3335ab6edf245d3e
     # via pokemon-classification
 packaging==26.0 \
     --hash=sha256:00243ae351a257117b6a241061796684b084ed1c516a08c48a3f7e147a9d80b4 \

@@ -72,3 +72,26 @@ def load_image(path: str | Path, *, as_gray: bool = False) -> np.ndarray:
     if img is None:
         raise FileNotFoundError(f"Unable to load image: {path}")
     return img
+
+
+def crop_with_bbox(
+    image: np.ndarray,
+    bbox: tuple[int, int, int, int],
+) -> np.ndarray:
+    """
+    Crop an image using a bounding box
+
+    Parameters
+    ----------
+    image : np.ndarray
+        Image (H, W, C)
+    bbox : tuple[int, int, int, int]
+        (x, y, width, height)
+
+    Returns
+    -------
+    np.ndarray
+        Cropped image
+    """
+    x, y, w, h = bbox
+    return image[y : y + h, x : x + w].copy()

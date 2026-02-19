@@ -1,15 +1,25 @@
 import logging
+import sys
+import time
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
+from sklearn.metrics import (
+    accuracy_score,
+    classification_report,
+    f1_score,
+    precision_score,
+    recall_score,
+)
 from sklearn.model_selection import train_test_split
-from tqdm import tqdm
+from sklearn.preprocessing import LabelEncoder
 
+from background import remove_background
 from bovw import BoVW
-from config import ExtractMethod
+from config import BackgroundMethod, ExtractMethod, FitPredictModel
 from features import extract_descriptors
-from logging_config import setup_logging
+from logging_config import disable_logging, setup_logging
 from preprocessing import preprocessing
 from utils import load_image
 
@@ -17,9 +27,23 @@ logger = logging.getLogger(__name__)
 setup_logging(logging.INFO)
 
 
+def is_notebook() -> bool:
+    """
+    Detect if the code is running inside a Jupyter notebook.
+    """
+    return "ipykernel" in sys.modules
+
+
+if is_notebook():
+    from tqdm.notebook import tqdm
+else:
+    from tqdm import tqdm
+
+
 def _get_descriptors(
     dataset: pd.Series,
-    method: ExtractMethod,
+    extract_method: ExtractMethod,
+    background_method: BackgroundMethod,
     max_features: int,
     display: str,
 ) -> list[np.ndarray]:
@@ -30,8 +54,10 @@ def _get_descriptors(
     ----------
     dataset : pd.Series
         Series containing image file paths
-    method : ExtractMethod
+    extract_method : ExtractMethod
         Descriptor extraction method
+    background_method : BackgroundMethod
+        Background segmentation method
     max_features : int
         Maximum number of keypoints/descriptors to keep per image
 
@@ -51,7 +77,8 @@ def _get_descriptors(
     ) as pbar:
         for p in dataset:
             img = preprocessing(load_image(Path(p)))
-            desc = extract_descriptors(img, method=method, max_features=max_features)
+            img = remove_background(img, method=background_method)
+            desc = extract_descriptors(img, method=extract_method, max_features=max_features)
             desc_list.append(desc)
             pbar.update(1)
     return desc_list
@@ -60,7 +87,8 @@ def _get_descriptors(
 def split_dataset(
     dataset: pd.Series,
     label: pd.Series,
-    method: ExtractMethod,
+    extract_method: ExtractMethod,
+    background_method: BackgroundMethod,
     test_size: int = 0.2,
     max_features: int = 800,
     n_words: int = 512,
@@ -74,8 +102,10 @@ def split_dataset(
         Series of image paths
     label : pd.Series
         Series of labels
-    method : ExtractMethod
-        Descriptor method
+    extract_method : ExtractMethod
+        Descriptor extraction method
+    background_method : BackgroundMethod
+        Background segmentation method
     test_size : int, optional
         Fraction of samples used as test set
     max_features : int, optional
@@ -99,8 +129,20 @@ def split_dataset(
         f"Dataset split done ! (train={len(x_train_paths)}, test={len(x_test_paths)})",
     )
 
-    desc_train = _get_descriptors(x_train_paths, method, max_features, "train")
-    desc_test = _get_descriptors(x_test_paths, method, max_features, "test")
+    desc_train = _get_descriptors(
+        x_train_paths,
+        extract_method,
+        background_method,
+        max_features,
+        "train",
+    )
+    desc_test = _get_descriptors(
+        x_test_paths,
+        extract_method,
+        background_method,
+        max_features,
+        "test",
+    )
 
     logger.info("Starting BoVW training...")
 
@@ -116,3 +158,81 @@ def split_dataset(
     logger.info("BoVW encoding done ! ")
 
     return x_train, x_test, y_train, y_test
+
+
+@disable_logging(logging.INFO)
+def evaluate_all_methods(
+    dataset: pd.Series,
+    labels: pd.Series,
+    label_encoder: LabelEncoder,
+    models: list[FitPredictModel, dict | None],
+) -> pd.DataFrame:
+    results = []
+    total = len(models) * len(ExtractMethod) * len(BackgroundMethod)
+
+    with tqdm(
+        total=total,
+        desc="Evaluation",
+        bar_format="{desc}: {percentage:3.0f}%|{bar:30}| {n_fmt}/{total_fmt} {postfix}",
+        colour="blue",
+    ) as pbar:
+        for model_class, model_params in models:
+            for extract in ExtractMethod:
+                for background in BackgroundMethod:
+                    pbar.set_postfix_str(
+                        f"model={model_class.__name__} | "
+                        f"extract={extract.name} | "
+                        f"background={background.name}",
+                    )
+
+                    x_train, x_test, y_train, y_test = split_dataset(
+                        dataset,
+                        labels,
+                        extract,
+                        background,
+                    )
+
+                    model: FitPredictModel = model_class(**model_params)
+
+                    start = time.time()
+                    model.fit(x_train, y_train)
+                    train_time = time.time() - start
+
+                    y_pred = model.predict(x_test)
+
+                    results.append(
+                        {
+                            "model": model_class.__name__,
+                            "extract_method": extract.name,
+                            "background_method": background.name,
+                            "accuracy": accuracy_score(y_test, y_pred),
+                            "precision_macro": precision_score(
+                                y_test,
+                                y_pred,
+                                average="macro",
+                                zero_division=0,
+                            ),
+                            "recall_macro": recall_score(
+                                y_test,
+                                y_pred,
+                                average="macro",
+                                zero_division=0,
+                            ),
+                            "f1_macro": f1_score(
+                                y_test,
+                                y_pred,
+                                average="macro",
+                                zero_division=0,
+                            ),
+                            "classification_report": classification_report(
+                                y_test,
+                                y_pred,
+                                target_names=label_encoder.classes_,
+                                zero_division=0,
+                            ),
+                            "train_time_sec": train_time,
+                        },
+                    )
+                    pbar.update(1)
+
+    return pd.DataFrame(results)

@@ -1,10 +1,17 @@
+import matplotlib.patches as patches
 import numpy as np
 import seaborn as sns
 from matplotlib import pyplot as plt
 from sklearn.metrics import confusion_matrix
 
 
-def show_image(img: np.ndarray, title: str = "", *, cmap: str | None = None) -> None:
+def show_image(
+    img: np.ndarray,
+    title: str = "",
+    *,
+    cmap: str | None = None,
+    bbox: tuple[int, int, int, int] | None = None,
+) -> None:
     """
     Display an image using matplotlib
 
@@ -16,12 +23,26 @@ def show_image(img: np.ndarray, title: str = "", *, cmap: str | None = None) -> 
         Figure title
     cmap : str | None, optional
         Colormap
+    bbox : tuple[int, int, int, int] | None, optional
+        bbox to display (x, y, width, height)
     """
     cmap = cmap or "gray" if img.ndim == 2 else None
-    plt.figure(figsize=(6, 6))
-    plt.imshow(img, cmap=cmap)
-    plt.title(title)
-    plt.axis("off")
+    _, ax = plt.subplots(figsize=(6, 6))
+    ax.imshow(img, cmap=cmap)
+    ax.set_title(title)
+    ax.axis("off")
+    if bbox is not None:
+        x, y, w, h = bbox
+        rect = patches.Rectangle(
+            (x, y),
+            w,
+            h,
+            linewidth=2,
+            edgecolor="red",
+            facecolor="none",
+        )
+        ax.add_patch(rect)
+
     plt.show()
 
 
