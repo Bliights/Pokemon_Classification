@@ -10,33 +10,11 @@ from datasets import load_dataset
 from PIL import Image, UnidentifiedImageError
 from tqdm import tqdm
 
+from config import DATASET_PATH
+from logging_config import setup_logging
+
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
-
-
-# ------------------- LOGGING CONFIGURATION --------------------------
-class ColorFormatter(logging.Formatter):
-    COLORS = {
-        logging.DEBUG: "\033[92m",  # Green
-        logging.INFO: "\033[96m",  # Cyan
-        logging.WARNING: "\033[93m",  # Yellow
-        logging.ERROR: "\033[91m",  # Red
-        logging.CRITICAL: "\033[91;1m",  # Bold red
-    }
-    RESET = "\033[0m"
-
-    def format(self, record: logging.LogRecord) -> str:
-        color = self.COLORS.get(record.levelno, self.RESET)
-        message = super().format(record)
-        return f"{color}{message}{self.RESET}"
-
-
-log_format = "[%(levelname)s] : %(message)s"
-
-logging.basicConfig(level=logging.INFO, format=log_format)
-
-for handler in logging.getLogger().handlers:
-    handler.setFormatter(ColorFormatter(log_format))
+setup_logging(logging.INFO)
 
 logging.getLogger("httpx").setLevel(logging.WARNING)
 
@@ -334,24 +312,65 @@ def slug(s: str) -> str:
     return s or "unknown"
 
 
-def pokemon_names(row: dict) -> list[str]:
+def pokemon_names(tags: dict) -> list[str]:
     """
     Extract a stable list of Pokémon names from a dataset row.
 
     Parameters
     ----------
-    row : dict[str, Any]
-        One dataset sample.
+    tags : dict[str, Any]
+        tags of the row.
 
     Returns
     -------
     list[str]
         Sorted, unique Pokémon name tokens.
     """
-    tags = parse_tags(row.get("tags", "{}"))
     names = tags.get("Pokémon") or tags.get("Pokemon") or []
     names = [slug(x) for x in names if x]
     return sorted(set(names))
+
+
+def keep_row(row: dict) -> tuple[bool, list[str]]:
+    """
+    Decide whether a dataset sample should be kept for a "single Pokémon, no trainer"
+    classification subset, and return the associated Pokémon label(s).
+
+    The sample is kept only if all conditions below are satisfied:
+        1) No trainer is present: `trainer_presence` must exist and be exactly False.
+        2) The image is not a multi-panel/collage: `multi_panel` must not be True.
+        3) If provided, `subject_count` must be `"single"` (otherwise the sample is rejected).
+        4) Exactly one Pokémon name can be extracted from the tags.
+
+    Parameters
+    ----------
+    row : dict
+        One example (row) from the dataset. Must contain a `tags` field that is either
+        a JSON string or a dictionary compatible with `parse_tags()`.
+
+    Returns
+    -------
+    tuple[bool, list[str]]
+        A tuple `(keep, names)` where:
+        - `keep` is True if the sample matches the filtering criteria, False otherwise.
+        - `names` is the (slugified) list of Pokémon names extracted from the tags.
+    """
+    tags = parse_tags(row.get("tags"))
+    if tags.get("trainer_presence") is not False:
+        return False, []
+
+    if tags.get("multi_panel") is True:
+        return False, []
+
+    subject_count = tags.get("subject_count")
+    if subject_count is not None and subject_count != "single":
+        return False, []
+
+    names = pokemon_names(tags)
+    if len(names) != 1:
+        return False, []
+
+    return True, names
 
 
 def build_stem(download_index: int, names: list[str]) -> str:
@@ -399,11 +418,12 @@ def download_dataset() -> None:
     # Load dataset (Hugging Face)
     dataset = load_dataset("Kev0208/PokeFA-pokemon-fanart-captioned", trust_remote_code=False)
     dataset = dataset["train"]
-    data_dir = Path(__file__).resolve().parents[1] / "data" / "fanart-dataset"
+    data_dir = DATASET_PATH
     data_dir.mkdir(parents=True, exist_ok=True)
 
     ok = 0
     skipped = 0
+    filtered = 0
     total = len(dataset)
     tmp_path: Path | None = None
 
@@ -416,8 +436,18 @@ def download_dataset() -> None:
         ) as pbar:
             for i in pbar:
                 row = dataset[i]
+                keep, names = keep_row(row)
+                if not keep:
+                    filtered += 1
+                    pbar.set_postfix_str(f"ok={ok} skipped={skipped} filtered={filtered}")
+                    continue
+
                 url = row["source_url"]
-                names = pokemon_names(row)
+                if not url:
+                    skipped += 1
+                    pbar.set_postfix_str(f"ok={ok} skipped={skipped} filtered={filtered} (no url)")
+                    continue
+
                 stem = build_stem(ok, names)
 
                 # 1) Strict download into a temporary file
@@ -425,7 +455,9 @@ def download_dataset() -> None:
                 saved = download_strict_image(url, tmp_path, max_mb=15, timeout=30, sniff_kb=512)
                 if saved is None:
                     skipped += 1
-                    pbar.set_postfix_str(f"ok={ok} skipped={skipped} (Skip at download)")
+                    pbar.set_postfix_str(
+                        f"ok={ok} skipped={skipped} filtered={filtered} (Skip at download)",
+                    )
                     logger.debug("Skip (not an image / too big / failed): %s", url)
                     tmp_path = None
                     continue
@@ -438,7 +470,9 @@ def download_dataset() -> None:
                         im.save(final_path, "JPEG", quality=95, optimize=True)
                 except Exception as e:
                     skipped += 1
-                    pbar.set_postfix_str(f"ok={ok} skipped={skipped} (Skip at convert)")
+                    pbar.set_postfix_str(
+                        f"ok={ok} skipped={skipped} filtered={filtered} (Skip at convert)",
+                    )
                     logger.debug("Skip (convert failed): %s | %s", url, e)
                     continue
                 finally:
@@ -446,13 +480,16 @@ def download_dataset() -> None:
                     tmp_path = None
 
                 ok += 1
-                pbar.set_postfix_str(f"ok={ok} skipped={skipped} last={final_path.name}")
+                pbar.set_postfix_str(
+                    f"ok={ok} skipped={skipped} filtered={filtered} last={final_path.name}",
+                )
 
             logger.info(
-                "Dataset download in %s finished ! (Saved=%d | Skipped=%d)",
+                "Dataset download in %s finished ! (Saved=%d | Skipped=%d | FilteredOut=%d)",
                 data_dir,
                 ok,
                 skipped,
+                filtered,
             )
     except KeyboardInterrupt:
         if tmp_path is not None:
@@ -460,10 +497,11 @@ def download_dataset() -> None:
             part = tmp_path.with_suffix(tmp_path.suffix + ".part")
             part.unlink(missing_ok=True)
         logger.info(
-            "Dataset download stopped. OutDir=%s | Saved=%d | Skipped=%d",
+            "Dataset download in %s finished ! (Saved=%d | Skipped=%d | FilteredOut=%d)",
             data_dir,
             ok,
             skipped,
+            filtered,
         )
 
 
