@@ -3,7 +3,7 @@ import numpy as np
 
 
 def enhance_contrast_clahe(
-    rgb: np.ndarray,
+    bgr: np.ndarray,
     clip_limit: float = 2.0,
     tile_grid_size: int = 8,
 ) -> np.ndarray:
@@ -14,8 +14,8 @@ def enhance_contrast_clahe(
 
     Parameters
     ----------
-    rgb : np.ndarray
-        Input RGB image
+    bgr : np.ndarray
+        Input BGR image
     clip_limit : float, optional
         CLAHE clipping limit
     tile_grid_size : int, optional
@@ -26,7 +26,6 @@ def enhance_contrast_clahe(
     np.ndarray
         RGB image with enhanced contrast
     """
-    bgr = cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR)
     lab = cv2.cvtColor(bgr, cv2.COLOR_BGR2LAB)
     l_chan, a_chan, b_chan = cv2.split(lab)
 
@@ -34,22 +33,21 @@ def enhance_contrast_clahe(
     l_enhanced = clahe.apply(l_chan)
 
     lab_enhanced = cv2.merge((l_enhanced, a_chan, b_chan))
-    bgr_enhanced = cv2.cvtColor(lab_enhanced, cv2.COLOR_LAB2BGR)
-    return cv2.cvtColor(bgr_enhanced, cv2.COLOR_BGR2RGB)
+    return cv2.cvtColor(lab_enhanced, cv2.COLOR_LAB2BGR)
 
 
-def preprocessing(rgb: np.ndarray) -> np.ndarray:
+def preprocessing(bgr: np.ndarray) -> np.ndarray:
     """
     Apply the preprocessing pipeline to improve image quality
 
     Parameters
     ----------
-    rgb : np.ndarray
-        Input RGB image
+    bgr : np.ndarray
+        Input BGR image
 
     Returns
     -------
     np.ndarray
-        Preprocessed RGB image
+        Preprocessed BGR image
     """
-    return enhance_contrast_clahe(rgb)
+    return enhance_contrast_clahe(bgr)

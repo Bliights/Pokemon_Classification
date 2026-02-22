@@ -33,3 +33,7 @@ pre-commit:
 download-dataset:
 	@echo Start of dataset download...
 	uv run python .\src\extract_dataset.py
+
+data-augmentation:
+	@echo Start of the data augmentation...
+	uv run python .\src\data_augmentation.py

@@ -1,7 +1,10 @@
+from pathlib import Path
+
 import cv2
 import numpy as np
 
-from config import BackgroundMethod
+from config import BACKGROUND_PATH, BackgroundMethod
+from utils import load_image
 
 
 def _largest_component(
@@ -113,6 +116,7 @@ def segment_pokemon(im: np.ndarray, grabcut_iter: int = 5) -> np.ndarray:
 
 def remove_background(
     im: np.ndarray,
+    img_path: Path,
     method: BackgroundMethod,
     **kwargs,
 ) -> np.ndarray:
@@ -123,6 +127,8 @@ def remove_background(
     ----------
     im : np.ndarray
         The original image
+    img_path : Path
+        Path to the original image
     method : BackgroundMethod
         Method of segmentation to use
 
@@ -139,6 +145,13 @@ def remove_background(
     if method == BackgroundMethod.NONE:
         return im
     if method == BackgroundMethod.GRABCUT:
+        BACKGROUND_PATH.mkdir(parents=True, exist_ok=True)
+        cached_path = BACKGROUND_PATH / f"{img_path.stem}_grabcut.jpg"
+        if cached_path.exists():
+            return load_image(cached_path)
+
         mask = segment_pokemon(im, **kwargs)
-        return cv2.bitwise_and(im, im, mask=mask)
+        segmented = cv2.bitwise_and(im, im, mask=mask)
+        cv2.imencode(".jpg", segmented)[1].tofile(str(cached_path))
+        return segmented
     raise ValueError(f"Unknown method: {method}")

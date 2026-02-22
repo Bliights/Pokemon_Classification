@@ -1,3 +1,4 @@
+import cv2
 import matplotlib.patches as patches
 import numpy as np
 import seaborn as sns
@@ -28,7 +29,7 @@ def show_image(
     """
     cmap = cmap or "gray" if img.ndim == 2 else None
     _, ax = plt.subplots(figsize=(6, 6))
-    ax.imshow(img, cmap=cmap)
+    ax.imshow(cv2.cvtColor(img, cv2.COLOR_BGR2RGB), cmap=cmap)
     ax.set_title(title)
     ax.axis("off")
     if bbox is not None:

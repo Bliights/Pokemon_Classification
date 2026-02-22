@@ -10,6 +10,7 @@ from datasets import load_dataset
 from PIL import Image, UnidentifiedImageError
 from tqdm import tqdm
 
+from config import DATASET_PATH
 from logging_config import setup_logging
 
 logger = logging.getLogger(__name__)
@@ -417,7 +418,7 @@ def download_dataset() -> None:
     # Load dataset (Hugging Face)
     dataset = load_dataset("Kev0208/PokeFA-pokemon-fanart-captioned", trust_remote_code=False)
     dataset = dataset["train"]
-    data_dir = Path(__file__).resolve().parents[1] / "data" / "fanart-dataset"
+    data_dir = DATASET_PATH
     data_dir.mkdir(parents=True, exist_ok=True)
 
     ok = 0

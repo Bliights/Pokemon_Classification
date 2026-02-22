@@ -17,7 +17,8 @@ from sklearn.preprocessing import LabelEncoder
 
 from background import remove_background
 from bovw import BoVW
-from config import BackgroundMethod, ExtractMethod, FitPredictModel
+from config import AugmentationMethod, BackgroundMethod, ExtractMethod, FitPredictModel
+from data_augmentation import data_augmentation
 from features import extract_descriptors
 from logging_config import disable_logging, setup_logging
 from preprocessing import preprocessing
@@ -76,8 +77,9 @@ def _get_descriptors(
         colour="green",
     ) as pbar:
         for p in dataset:
-            img = preprocessing(load_image(Path(p)))
-            img = remove_background(img, method=background_method)
+            im_path = Path(p)
+            img = preprocessing(load_image(im_path))
+            img = remove_background(img, im_path, method=background_method)
             desc = extract_descriptors(img, method=extract_method, max_features=max_features)
             desc_list.append(desc)
             pbar.update(1)
@@ -87,6 +89,7 @@ def _get_descriptors(
 def split_dataset(
     dataset: pd.Series,
     label: pd.Series,
+    augmentation_method: AugmentationMethod,
     extract_method: ExtractMethod,
     background_method: BackgroundMethod,
     test_size: int = 0.2,
@@ -102,6 +105,8 @@ def split_dataset(
         Series of image paths
     label : pd.Series
         Series of labels
+    augmentation_method : AugmentationMethod
+        Data augmentation method
     extract_method : ExtractMethod
         Descriptor extraction method
     background_method : BackgroundMethod
@@ -127,6 +132,12 @@ def split_dataset(
     )
     logger.info(
         f"Dataset split done ! (train={len(x_train_paths)}, test={len(x_test_paths)})",
+    )
+
+    x_train_paths, y_train = data_augmentation(x_train_paths, y_train, augmentation_method)
+
+    logger.info(
+        f"Dataset augmentation done ! (train={len(x_train_paths)}, test={len(x_test_paths)})",
     )
 
     desc_train = _get_descriptors(
@@ -167,8 +178,30 @@ def evaluate_all_methods(
     label_encoder: LabelEncoder,
     models: list[FitPredictModel, dict | None],
 ) -> pd.DataFrame:
+    """
+    Evaluate all combinations of models, augmentation strategies, feature extraction methods
+    and background removal methods
+
+    Parameters
+    ----------
+    dataset : pd.Series
+        Series containing image file paths
+    labels : pd.Series
+        Series containing the corresponding Pokemon labels
+    label_encoder : LabelEncoder
+        Fitted LabelEncoder used to retrieve class names for the
+        classification report
+    models : list[FitPredictModel, dict  |  None]
+        List of tuples containing the model class to instantiate and the optional
+        dictionary of initialization parameters
+
+    Returns
+    -------
+    pd.DataFrame
+        A dataframe containing the result for each configuration
+    """
     results = []
-    total = len(models) * len(ExtractMethod) * len(BackgroundMethod)
+    total = len(models) * len(AugmentationMethod) * len(ExtractMethod) * len(BackgroundMethod)
 
     with tqdm(
         total=total,
@@ -177,62 +210,66 @@ def evaluate_all_methods(
         colour="blue",
     ) as pbar:
         for model_class, model_params in models:
-            for extract in ExtractMethod:
-                for background in BackgroundMethod:
-                    pbar.set_postfix_str(
-                        f"model={model_class.__name__} | "
-                        f"extract={extract.name} | "
-                        f"background={background.name}",
-                    )
+            for augmentation in AugmentationMethod:
+                for extract in ExtractMethod:
+                    for background in BackgroundMethod:
+                        pbar.set_postfix_str(
+                            f"model={model_class.__name__} | "
+                            f"augmentation={augmentation.name} | "
+                            f"extract={extract.name} | "
+                            f"background={background.name}",
+                        )
 
-                    x_train, x_test, y_train, y_test = split_dataset(
-                        dataset,
-                        labels,
-                        extract,
-                        background,
-                    )
+                        x_train, x_test, y_train, y_test = split_dataset(
+                            dataset,
+                            labels,
+                            augmentation,
+                            extract,
+                            background,
+                        )
 
-                    model: FitPredictModel = model_class(**model_params)
+                        model: FitPredictModel = model_class(**model_params)
 
-                    start = time.time()
-                    model.fit(x_train, y_train)
-                    train_time = time.time() - start
+                        start = time.time()
+                        model.fit(x_train, y_train)
+                        train_time = time.time() - start
 
-                    y_pred = model.predict(x_test)
+                        y_pred = model.predict(x_test)
 
-                    results.append(
-                        {
-                            "model": model_class.__name__,
-                            "extract_method": extract.name,
-                            "background_method": background.name,
-                            "accuracy": accuracy_score(y_test, y_pred),
-                            "precision_macro": precision_score(
-                                y_test,
-                                y_pred,
-                                average="macro",
-                                zero_division=0,
-                            ),
-                            "recall_macro": recall_score(
-                                y_test,
-                                y_pred,
-                                average="macro",
-                                zero_division=0,
-                            ),
-                            "f1_macro": f1_score(
-                                y_test,
-                                y_pred,
-                                average="macro",
-                                zero_division=0,
-                            ),
-                            "classification_report": classification_report(
-                                y_test,
-                                y_pred,
-                                target_names=label_encoder.classes_,
-                                zero_division=0,
-                            ),
-                            "train_time_sec": train_time,
-                        },
-                    )
-                    pbar.update(1)
+                        results.append(
+                            {
+                                "model": model_class.__name__,
+                                "augmentation_method": augmentation.name,
+                                "extract_method": extract.name,
+                                "background_method": background.name,
+                                "accuracy": accuracy_score(y_test, y_pred),
+                                "precision_macro": precision_score(
+                                    y_test,
+                                    y_pred,
+                                    average="macro",
+                                    zero_division=0,
+                                ),
+                                "recall_macro": recall_score(
+                                    y_test,
+                                    y_pred,
+                                    average="macro",
+                                    zero_division=0,
+                                ),
+                                "f1_macro": f1_score(
+                                    y_test,
+                                    y_pred,
+                                    average="macro",
+                                    zero_division=0,
+                                ),
+                                "classification_report": classification_report(
+                                    y_test,
+                                    y_pred,
+                                    target_names=label_encoder.classes_,
+                                    zero_division=0,
+                                ),
+                                "train_time_sec": train_time,
+                            },
+                        )
+                        pbar.update(1)
 
     return pd.DataFrame(results)
