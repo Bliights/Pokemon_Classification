@@ -11,6 +11,8 @@ dependencies = [
     "pillow>=12.1.0",
     "scikit-learn>=1.8.0",
     "seaborn>=0.13.2",
+    "torch>=2.9.0",
+    "torchvision>=0.24.0",
     "tqdm>=4.67.1",
 ]
 
@@ -21,6 +23,19 @@ dev = [
     "pre-commit>=4.3.0",
     "ruff>=0.14.7",
 ]
+
+[tool.uv.sources]
+torch = [
+  { index = "pytorch-cu128", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
+]
+torchvision = [
+  { index = "pytorch-cu128", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
+]
+
+[[tool.uv.index]]
+name = "pytorch-cu128"
+url = "https://download.pytorch.org/whl/cu128"
+explicit = true
 
 [tool.ruff]
 line-length = 100
